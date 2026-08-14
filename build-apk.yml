@@ -1,0 +1,48 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Crear el proyecto Flutter base (android/ios/etc autogenerado)
+        run: flutter create --platforms=android --org com.crdrosoy app
+
+      - name: Forzar permisos de ubicación en el manifiesto de Android
+        run: |
+          sed -i '/<manifest /a \
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>' \
+              app/android/app/src/main/AndroidManifest.xml
+          cat app/android/app/src/main/AndroidManifest.xml
+
+      - name: Copiar nuestro código encima del proyecto base
+        run: |
+          cp app_src/pubspec.yaml app/pubspec.yaml
+          cp -r app_src/lib/. app/lib/
+
+      - name: Descargar dependencias
+        working-directory: app
+        run: flutter pub get
+
+      - name: Compilar APK
+        working-directory: app
+        run: flutter build apk --release
+
+      - name: Subir APK como descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: gps-autocaravana-apk
+          path: app/build/app/outputs/flutter-apk/app-release.apk
